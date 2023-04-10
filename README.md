@@ -164,10 +164,10 @@ Maybe using a different replacement strategy in `BufferPoolMgr` results in bette
 
 ### Phase 1
 
-Submit your work before **2022/04/26 (Wed.) 23:59:59**.
+Submit your work before **2023/04/26 (Wed.) 23:59:59**.
 
 ### Phase 2
 
-Submit your work before **2022/05/03 (Wed.) 23:59:59**.
+Submit your work before **2023/05/03 (Wed.) 23:59:59**.
 
 Late submission will NOT be accepted.
