@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <groupId>org.vanilladb</groupId>
+  <artifactId>core</artifactId>
+  <versioning>
+    <release>0.7.0-course</release>
+    <versions>
+      <version>0.7.0-course</version>
+    </versions>
+    <lastUpdated>20230410024530</lastUpdated>
+  </versioning>
+</metadata>
