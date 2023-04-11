@@ -4,6 +4,6 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.vanilladb</groupId>
   <artifactId>core</artifactId>
-  <version>0.7.0-course</version>
+  <version>0.7.0-course-20230307</version>
   <description>POM was created from install:install-file</description>
 </project>

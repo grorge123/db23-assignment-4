@@ -31,7 +31,7 @@
 		<dependency>
 			<groupId>org.vanilladb</groupId>
 			<artifactId>core</artifactId>
-			<version>0.7.0-course</version>
+			<version>0.7.0-course-20230307</version>
 		</dependency>
 	</dependencies>
 

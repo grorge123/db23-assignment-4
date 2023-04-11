@@ -3,10 +3,10 @@
   <groupId>org.vanilladb</groupId>
   <artifactId>core</artifactId>
   <versioning>
-    <release>0.7.0-course</release>
+    <release>0.7.0-course-20230307</release>
     <versions>
-      <version>0.7.0-course</version>
+      <version>0.7.0-course-20230307</version>
     </versions>
-    <lastUpdated>20230411135804</lastUpdated>
+    <lastUpdated>20230313101837</lastUpdated>
   </versioning>
 </metadata>
