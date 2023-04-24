@@ -16,6 +16,7 @@
 package org.vanilladb.core.storage.buffer;
 
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -49,6 +50,7 @@ public class Buffer {
 	private Page contents = new Page();
 	private BlockId blk = null;
 	private int pins = 0;
+	private Object objectPins = new Object();
 	private boolean isNew = false;
 	private Set<Long> modifiedBy = new HashSet<Long>();
 	private LogSeqNum lastLsn = LogSeqNum.DEFAULT_VALUE;
@@ -84,8 +86,10 @@ public class Buffer {
 		return contents.getVal(DATA_START_OFFSET + offset, type);
 	}
 	
-	synchronized void setVal(int offset, Constant val) {
-		contents.setVal(DATA_START_OFFSET + offset, val);
+	void setVal(int offset, Constant val) {
+		synchronized(contents){
+			contents.setVal(DATA_START_OFFSET + offset, val);
+		}
 	}
 
 	/**
@@ -156,7 +160,7 @@ public class Buffer {
 		flushLock.unlock();
 	}
 
-	protected synchronized void close() {
+	protected void close() {
 		contents.close();
 	}
 
@@ -165,7 +169,7 @@ public class Buffer {
 	 * ensures that the corresponding log record has been written to disk prior
 	 * to writing the page to disk.
 	 */
-	synchronized void flush() {
+	 void flush() {
 		flushLock.lock();
 		try {
 			if (isNew || modifiedBy.size() > 0) {
@@ -182,15 +186,19 @@ public class Buffer {
 	/**
 	 * Increases the buffer's pin count.
 	 */
-	synchronized void pin() {
-		pins++;
+	void pin() {
+		synchronized(objectPins){
+			pins++;
+		}
 	}
 
 	/**
 	 * Decreases the buffer's pin count.
 	 */
-	synchronized void unpin() {
-		pins--;
+	void unpin() {
+		synchronized(objectPins){
+			pins--;
+		}
 	}
 
 	/**
@@ -199,7 +207,7 @@ public class Buffer {
 	 * 
 	 * @return true if the buffer is pinned
 	 */
-	synchronized boolean isPinned() {
+	boolean isPinned() {
 		return pins > 0;
 	}
 
@@ -208,7 +216,7 @@ public class Buffer {
 	 * 
 	 * @return true if the buffer is dirty
 	 */
-	synchronized boolean isModifiedBy(long txNum) {
+	boolean isModifiedBy(long txNum) {
 		return modifiedBy.contains(txNum);
 	}
 
@@ -220,11 +228,15 @@ public class Buffer {
 	 * @param blk
 	 *            a block ID
 	 */
-	synchronized void assignToBlock(BlockId blk) {
+	void assignToBlock(BlockId blk) {
 		flush();
 		this.blk = blk;
-		contents.read(blk);
-		pins = 0;
+		synchronized (contents){
+			contents.read(blk);
+		}
+		synchronized(objectPins) {
+			pins = 0;
+		}
 		lastLsn = LogSeqNum.readFromPage(contents, LAST_LSN_OFFSET);
 	}
 
@@ -241,8 +253,12 @@ public class Buffer {
 	synchronized void assignToNew(String fileName, PageFormatter fmtr) {
 		flush();
 		fmtr.format(this);
-		blk = contents.append(fileName);
-		pins = 0;
+		synchronized (contents){
+			blk = contents.append(fileName);
+		}
+		synchronized(objectPins){
+			pins = 0;
+		}
 		isNew = true;
 		lastLsn = LogSeqNum.DEFAULT_VALUE;
 	}
@@ -252,7 +268,9 @@ public class Buffer {
 	 * 
 	 * @return the underlying page
 	 */
-	synchronized Page getUnderlyingPage() {
-		return contents;
+	Page getUnderlyingPage() {
+		synchronized (contents){
+			return contents;
+		}
 	}
 }

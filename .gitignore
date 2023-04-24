@@ -9,3 +9,6 @@
 /**/.project
 /.metadata/
 
+.idea
+bench/bench.iml
+core-patch/core-patch.iml
