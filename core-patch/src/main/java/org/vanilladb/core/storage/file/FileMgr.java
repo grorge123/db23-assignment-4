@@ -54,6 +54,10 @@ public class FileMgr {
 	private File dbDirectory, logDirectory;
 	private boolean isNew;
 	private Map<String, IoChannel> openFiles = new ConcurrentHashMap<String, IoChannel>();
+	// Optimization technique: lock striping
+	// For files assigned to same strip, they share same lock.
+	private static final int stripCnt = 1024;
+	private static ReentrantLock[] fileLocks = new ReentrantLock[stripCnt];
 	
 	static {
 		String dbDir = CoreProperties.getLoader().getPropertyAsString(FileMgr.class.getName() + ".DB_FILES_DIR",
@@ -78,12 +82,10 @@ public class FileMgr {
 
 		DB_FILES_DIR = dbDir;
 		LOG_FILES_DIR = logDir;
-	}
 
-	// Optimization technique: lock striping
-	// For files assigned to same strip, they share same lock.
-	private static final int stripCnt = 1024;
-	private ReentrantLock[] fileLocks = new ReentrantLock[stripCnt];
+		for (int i = 0; i < stripCnt; ++i)
+			fileLocks[i] = new ReentrantLock();
+	}
 
 	private ReentrantLock getFileLock(Object o) {
 		int code = o.hashCode() % stripCnt;
@@ -124,9 +126,6 @@ public class FileMgr {
 
 		if (logger.isLoggable(Level.INFO))
 			logger.info("block size " + Page.BLOCK_SIZE);
-
-		for (int i = 0; i < stripCnt; ++i)
-			fileLocks[i] = new ReentrantLock();
 	}
 
 	/**
@@ -223,16 +222,12 @@ public class FileMgr {
 	 * 
 	 * @return the number of blocks in the file
 	 */
-	public long size(String fileName) {
-		ReentrantLock fileLock = getFileLock(fileName);
-		fileLock.lock();
+	public synchronized long size(String fileName) {
 		try {
 			IoChannel fileChannel = getFileChannel(fileName);
 			return fileChannel.size() / BLOCK_SIZE;
 		} catch (IOException e) {
 			throw new RuntimeException("cannot access " + fileName);
-		} finally {
-			fileLock.unlock();
 		}
 	}
 	
@@ -244,7 +239,7 @@ public class FileMgr {
 	 * 
 	 * @return whether a file is empty or not
 	 */
-	public boolean isFileEmpty(String fileName) {
+	public synchronized boolean isFileEmpty(String fileName) {
 		return size(fileName) == 0;
 	}
 
@@ -289,9 +284,7 @@ public class FileMgr {
 	 * @param fileName
 	 *            the name of the target file
 	 */
-	public void delete(String fileName) {
-		ReentrantLock fileLock = getFileLock(fileName);
-		fileLock.lock();
+	public synchronized void delete(String fileName) {
 		try {
 			// Close file, if it was opened
 			IoChannel fileChannel = openFiles.remove(fileName);
@@ -306,8 +299,6 @@ public class FileMgr {
 			if (logger.isLoggable(Level.WARNING))
 				logger.warning("there is something wrong when deleting " + fileName);
 			e.printStackTrace();
-		} finally {
-			fileLock.unlock();
 		}
 	}
 }
