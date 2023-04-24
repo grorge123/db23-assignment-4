@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -79,6 +80,18 @@ public class FileMgr {
 		LOG_FILES_DIR = logDir;
 	}
 
+	// Optimization technique: lock striping
+	// For files assigned to same strip, they share same lock.
+	private static final int stripCnt = 1024;
+	private ReentrantLock[] fileLocks = new ReentrantLock[stripCnt];
+
+	private ReentrantLock getFileLock(Object o) {
+		int code = o.hashCode() % stripCnt;
+		if (code < 0)
+			code += stripCnt;
+		return fileLocks[code];
+	}
+
 	/**
 	 * Creates a file manager for the specified database. The database will be
 	 * stored in a folder of that name in the user's home directory. If the
@@ -111,6 +124,9 @@ public class FileMgr {
 
 		if (logger.isLoggable(Level.INFO))
 			logger.info("block size " + Page.BLOCK_SIZE);
+
+		for (int i = 0; i < stripCnt; ++i)
+			fileLocks[i] = new ReentrantLock();
 	}
 
 	/**
@@ -121,7 +137,9 @@ public class FileMgr {
 	 * @param buffer
 	 *            the byte buffer
 	 */
-	synchronized void read(BlockId blk, IoBuffer buffer) {
+	void read(BlockId blk, IoBuffer buffer) {
+		ReentrantLock fileLock = getFileLock(blk.fileName());
+		fileLock.lock();
 		try {
 			IoChannel fileChannel = getFileChannel(blk.fileName());
 
@@ -133,6 +151,8 @@ public class FileMgr {
 		} catch (IOException e) {
 			e.printStackTrace();
 			throw new RuntimeException("cannot read block " + blk);
+		} finally {
+			fileLock.unlock();
 		}
 	}
 
@@ -144,7 +164,9 @@ public class FileMgr {
 	 * @param buffer
 	 *            the byte buffer
 	 */
-	synchronized void write(BlockId blk, IoBuffer buffer) {
+	void write(BlockId blk, IoBuffer buffer) {
+		ReentrantLock fileLock = getFileLock(blk.fileName());
+		fileLock.lock();
 		try {
 			IoChannel fileChannel = getFileChannel(blk.fileName());
 
@@ -156,6 +178,8 @@ public class FileMgr {
 		} catch (IOException e) {
 			e.printStackTrace();
 			throw new RuntimeException("cannot write block" + blk);
+		} finally {
+			fileLock.unlock();
 		}
 	}
 
@@ -168,7 +192,9 @@ public class FileMgr {
 	 *            the byte buffer
 	 * @return a block ID refers to the newly-created block.
 	 */
-	synchronized BlockId append(String fileName, IoBuffer buffer) {
+	BlockId append(String fileName, IoBuffer buffer) {
+		ReentrantLock fileLock = getFileLock(fileName);
+		fileLock.lock();
 		try {
 			IoChannel fileChannel = getFileChannel(fileName);
 
@@ -184,6 +210,8 @@ public class FileMgr {
 		} catch (IOException e) {
 			e.printStackTrace();
 			return null;
+		} finally {
+			fileLock.unlock();
 		}
 	}
 
@@ -195,12 +223,16 @@ public class FileMgr {
 	 * 
 	 * @return the number of blocks in the file
 	 */
-	public synchronized long size(String fileName) {
+	public long size(String fileName) {
+		ReentrantLock fileLock = getFileLock(fileName);
+		fileLock.lock();
 		try {
 			IoChannel fileChannel = getFileChannel(fileName);
 			return fileChannel.size() / BLOCK_SIZE;
 		} catch (IOException e) {
 			throw new RuntimeException("cannot access " + fileName);
+		} finally {
+			fileLock.unlock();
 		}
 	}
 	
@@ -257,7 +289,9 @@ public class FileMgr {
 	 * @param fileName
 	 *            the name of the target file
 	 */
-	public synchronized void delete(String fileName) {
+	public void delete(String fileName) {
+		ReentrantLock fileLock = getFileLock(fileName);
+		fileLock.lock();
 		try {
 			// Close file, if it was opened
 			IoChannel fileChannel = openFiles.remove(fileName);
@@ -272,6 +306,8 @@ public class FileMgr {
 			if (logger.isLoggable(Level.WARNING))
 				logger.warning("there is something wrong when deleting " + fileName);
 			e.printStackTrace();
+		} finally {
+			fileLock.unlock();
 		}
 	}
 }
